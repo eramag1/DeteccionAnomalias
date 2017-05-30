@@ -1,0 +1,74 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+VAGRANTFILE_API_VERSION = "2"
+
+# All Vagrant configuration is done below. The "2" in Vagrant.configure
+# configures the configuration version (we support older styles for
+# backwards compatibility). Please don't change it unless you know what
+# you're doing.
+Vagrant.configure(2) do |config|  
+
+  config.ssh.insert_key = false
+
+  config.vm.box = "ubuntu/trusty64"
+
+  config.vm.provider :virtualbox do |vb|
+    vb.customize ["modifyvm", :id, "--memory", "4096"]
+    vb.customize ["modifyvm", :id, "--cpus", "2"]
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+  end  
+  
+  config.vm.define :fiware do |op|
+    op.vm.hostname = "fiware.vagrant"
+  end
+
+  config.vm.provision "docker" do |d|
+  # https://www.vagrantup.com/docs/provisioning/docker.html
+    
+    d.run "mongodb",
+      image: "mongo:latest",
+      args: "-t -p 27017:27017 -d"
+
+    d.run "orion1",
+      image: "fiware/orion",
+      args: "--link mongodb:mongodb -t -p 1026:1026 -d",
+      cmd: "-dbhost mongodb"
+
+    d.run "orion2",
+      image: "fiware/orion",
+      args: "--link mongodb:mongodb -t -p 1027:1026 -d",
+      cmd: "-dbhost mongodb"
+
+    d.run "elasticsearch",
+      image: "docker.elastic.co/elasticsearch/elasticsearch:5.4.0",
+      args: "-t -p 9200:9200 -e http.host=0.0.0.0 -e transport.host=127.0.0.1 -d"
+      # -v /usr/share/elasticsearch/data:/usr/share/elasticsearch/data -d"
+
+    d.run "logstash",
+      image: "docker.elastic.co/logstash/logstash:5.4.0",       
+      #  cmd: "-e 'input { beats { port => 5044 } } output { elasticsearch { hosts => elasticsearch:9200 } }'",
+      args: "-t -p 5044:5044 --link elasticsearch:elasticsearch -d"
+
+    d.run "filebeat",
+      image: "bargenson/filebeat:latest",
+      args: "-t -v /var/run/docker.sock:/tmp/docker.sock -e LOGSTASH_HOST=logstash -e LOGSTASH_PORT=5044 -e SHIPPER_NAME=$(hostname) --link logstash:logstash -d"
+    
+    d.run "kibana",
+      image: "docker.elastic.co/kibana/kibana:5.4.0",
+      args: "-t -p 5601:5601 --link elasticsearch:elasticsearch -d"    
+
+    d.run "portainer/portainer",
+      args: "--name portainer -t -p 9000:9000 -v /var/run/docker.sock:/var/run/docker.sock -d"
+               
+  end
+  
+  config.vm.network "forwarded_port", guest: 1026, host: 1026     # orion1
+  config.vm.network "forwarded_port", guest: 1027, host: 1027     # orion2
+  config.vm.network "forwarded_port", guest: 27017, host: 27017   # mongodb
+  config.vm.network "forwarded_port", guest: 9200, host: 9200     # elasticsearch
+  config.vm.network "forwarded_port", guest: 5601, host: 5601     # kibana
+
+  config.vm.network "forwarded_port", guest: 9000, host: 9900     # portainer
+
+end
