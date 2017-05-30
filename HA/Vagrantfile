@@ -1,0 +1,26 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+VAGRANTFILE_API_VERSION = "2"
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+
+  # Fix Vagrant 1.8.5 bug
+  # config.ssh.insert_key = false
+  
+  config.vm.provider :virtualbox do |vb|
+      vb.customize ["modifyvm", :id, "--cpus", "2", "--memory", "512"]
+  end
+
+  config.vm.box = "ubuntu/trusty64"
+
+  config.vm.define :haproxy, primary: true do |haproxy_config|
+
+    haproxy_config.vm.hostname = 'haproxy'
+    haproxy_config.vm.network :forwarded_port, host: 8080, guest: 8080
+    haproxy_config.vm.network :forwarded_port, host: 1025, guest: 1026
+    haproxy_config.vm.network :private_network, ip: "172.28.33.1"
+    haproxy_config.vm.provision :shell, :path => "provision-haproxy.sh"
+  end
+ 
+end

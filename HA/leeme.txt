@@ -1,0 +1,11 @@
+HAPROXY ADMIN CONSOLE
+http://localhost:8080/haproxy?stats
+
+CONTEXT BROKER REQUEST INPUT
+http://localhost:1025/version
+
+ORION 1
+http://localhost:1026/version
+
+ORION 2
+http://localhost:1027/version
